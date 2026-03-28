@@ -1,0 +1,12 @@
+cerere punctul d
+
+SELECT 
+    S.nume, 
+    S.prenume, 
+    COUNT(I.id_imprumut) AS Total_Carti_Imprumutate
+FROM Student S
+JOIN Imprumut I ON S.id_student = I.id_student
+GROUP BY S.id_student, S.nume, S.prenume
+HAVING COUNT(I.id_imprumut) >= 2;
+
+studentii care au imprumutat mai mult de doua ori

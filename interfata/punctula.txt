@@ -1,0 +1,161 @@
+<?php
+// Include conexiunea la baza de date
+include 'db.php';
+
+// Fișier: list_with_menu.php - Meniu pentru selecție tabel și sortare (cu getColumnMeta pentru coloane)
+
+// Lista tabelelor din baza ta
+$tables = ['Facultate', 'Specializare', 'Student', 'Editura', 'Domeniu', 'Autor', 'Carte', 'Sala', 'Exemplar', 'Imprumut', 'Autor_Carte'];
+
+// Obține conexiunea (cu error handling)
+try {
+    $db = getDbConnection();
+} catch (Exception $e) {
+    die("Eroare la conexiune DB: " . $e->getMessage());
+}
+
+$selected_table = $_GET['tabel'] ?? '';
+$selected_sort = $_GET['sortare'] ?? '1';
+
+$columns = [];
+$rows = [];
+if ($selected_table) {
+    try {
+        // Query pentru coloane (folosim getColumnMeta pentru a obține coloane chiar dacă no rows)
+        $stmt = $db->query("SELECT * FROM $selected_table WHERE 1=0");
+        if ($stmt === false) {
+            throw new Exception("Query pentru coloane a eșuat. Verifică dacă tabelul '$selected_table' există în baza de date.");
+        }
+
+        $columns = [];
+        for ($i = 0; $i < $stmt->columnCount(); $i++) {
+            $meta = $stmt->getColumnMeta($i);
+            $columns[] = $meta['name'];
+        }
+
+        if (!empty($columns) && !in_array($selected_sort, $columns)) {
+            $selected_sort = $columns[0] ?? '1';
+        }
+
+        // Query pentru date
+        $stmt = $db->query("SELECT * FROM $selected_table ORDER BY $selected_sort");
+        if ($stmt === false) {
+            throw new Exception("Query pentru date a eșuat. Verifică sortarea sau tabelul.");
+        }
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        echo "Eroare la procesare tabel: " . $e->getMessage();
+    }
+}
+
+// AJAX pentru coloane (folosim getColumnMeta)
+if (isset($_GET['get_columns'])) {
+    $table = $_GET['get_columns'];
+    $response = ['columns' => [], 'error' => ''];
+    try {
+        $stmt = $db->query("SELECT * FROM $table WHERE 1=0");
+        if ($stmt === false) {
+            throw new Exception("Query AJAX eșuat - tabelul nu există sau conexiune problemă.");
+        }
+
+        $columns = [];
+        for ($i = 0; $i < $stmt->columnCount(); $i++) {
+            $meta = $stmt->getColumnMeta($i);
+            $columns[] = $meta['name'];
+        }
+        $response['columns'] = $columns;
+    } catch (Exception $e) {
+        $response['error'] = $e->getMessage();
+    }
+    echo json_encode($response);
+    exit;
+}
+?>
+
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <title>Listare cu Meniu</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; }
+        th { background-color: #f2f2f2; }
+        form { margin-bottom: 20px; }
+    </style>
+    <script>
+        async function loadColumns() {
+            const table = document.getElementById('tabel_select').value;
+            if (!table) {
+                document.getElementById('sort_select').innerHTML = '';
+                return;
+            }
+
+            try {
+                const response = await fetch(`?get_columns=${encodeURIComponent(table)}`);
+                if (!response.ok) throw new Error('Eroare response: ' + response.status);
+                const data = await response.json();
+
+                const sortSelect = document.getElementById('sort_select');
+                sortSelect.innerHTML = '';
+                if (data.error) {
+                    alert('Eroare server: ' + data.error + '. Verifică db.php, tabelul sau conexiunea Oracle.');
+                } else if (data.columns.length === 0) {
+                    alert('Nicio coloană găsită - tabel gol sau problemă query.');
+                } else {
+                    data.columns.forEach(col => {
+                        const option = document.createElement('option');
+                        option.value = col;
+                        option.textContent = col;
+                        sortSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Eroare la încărcare coloane: ' + error.message + '. Verifică dacă server-ul rulează sau URL-ul.');
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>Listare Conținut Tabele cu Sortare</h1>
+
+    <form method="get">
+        <label for="tabel_select">Selectează tabelul:</label><br>
+        <select id="tabel_select" name="tabel" onchange="loadColumns()">
+            <option value="">-- Alege --</option>
+            <?php foreach ($tables as $tbl): ?>
+                <option value="<?php echo $tbl; ?>" <?php if ($tbl == $selected_table) echo 'selected'; ?>><?php echo $tbl; ?></option>
+            <?php endforeach; ?>
+        </select><br><br>
+
+        <label for="sort_select">Sortează după:</label><br>
+        <select id="sort_select" name="sortare">
+            <?php foreach ($columns as $col): ?>
+                <option value="<?php echo $col; ?>" <?php if ($col == $selected_sort) echo 'selected'; ?>><?php echo $col; ?></option>
+            <?php endforeach; ?>
+        </select><br><br>
+
+        <input type="submit" value="Afișează">
+    </form>
+
+    <?php if ($selected_table): ?>
+        <h2>Conținut Tabel: <?php echo $selected_table; ?> (Sortat după <?php echo $selected_sort; ?>)</h2>
+        <table>
+            <tr>
+                <?php foreach ($columns as $col): ?>
+                    <th><?php echo $col; ?></th>
+                <?php endforeach; ?>
+            </tr>
+            <?php foreach ($rows as $row): ?>
+                <tr>
+                    <?php foreach ($columns as $col): ?>
+                        <td><?php echo $row[$col] ?? ''; ?></td>
+                    <?php endforeach; ?>
+                </tr>
+            <?php endforeach; ?>
+        </table>
+    <?php endif; ?>
+</body>
+</html>

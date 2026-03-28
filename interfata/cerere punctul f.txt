@@ -1,0 +1,27 @@
+1. Vizualizare compusa (student+specializare, vezi specializarea in acelasi tabel ca si student) (poti sa faci LMD)
+
+CREATE OR REPLACE VIEW V_Studenti_Info AS
+SELECT 
+    S.id_student,
+    S.nume,
+    S.prenume,
+    S.email,
+    S.nr_matricol,
+    SP.nume AS nume_specializare,
+    SP.id_facultate
+FROM Student S
+JOIN Specializare SP ON S.id_specializare = SP.id_specializare;
+
+2. Vizualizarea complexa (pt fiecare editura, cate titluri diferite sunt publicate si cate exemplare fizice sunt in biblioteca de la editura respectiva)
+
+CREATE OR REPLACE VIEW V_Statistici_Edituri AS
+SELECT 
+    ED.nume AS Editura,
+    ED.tara,
+    COUNT(DISTINCT C.ISBN) AS Nr_Titluri_Unice,
+    COUNT(E.cod_bare) AS Total_Exemplare_Fizice
+FROM Editura ED
+LEFT JOIN Carte C ON ED.id_editura = C.id_editura
+LEFT JOIN Exemplar E ON C.ISBN = E.ISBN
+GROUP BY ED.id_editura, ED.nume, ED.tara
+ORDER BY Nr_Titluri_Unice DESC;

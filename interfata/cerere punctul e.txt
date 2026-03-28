@@ -1,0 +1,1 @@
+DELETE FROM Carte WHERE ISBN = ? (isbn-ul cartii pe care apas eu)
